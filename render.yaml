@@ -1,0 +1,35 @@
+databases:
+  - name: e-homely-db
+    plan: free
+    databaseName: ehomely
+    user: ehomely
+
+services:
+  - type: web
+    name: e-homely
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn config.wsgi:application"
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ""
+      - key: DJANGO_CSRF_ORIGINS
+        value: ""
+      - key: DATABASE_URL
+        fromDatabase:
+          name: e-homely-db
+          property: connectionString
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12.7"

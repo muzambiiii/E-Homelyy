@@ -1,32 +1,25 @@
-# 🏠 E-Homely — Online Food Ordering for a Campus Canteen
+# 🏠 E-Homely — Online Food Ordering System
 
-**E-Homely** is a Django web app for a home-style Kerala canteen near the campus. Students and staff browse a meal-wise menu, pay online, and get a **4-digit token** to collect their food at the counter — no standing in long queues.
-
-> Pay online → get a token → watch the status update live → collect hot food.
+A **Django-based food ordering web application** built for a home-style canteen / mess. Customers browse a meal-wise menu, add dishes to a cart, pay the full amount online via **Razorpay**, and receive a **4-digit token number** to collect their order at the counter. Staff manage order status through a dedicated kitchen dashboard.
 
 ---
 
 ## ✨ Features
 
-### Customer side
-- **Meal-wise menu** — Breakfast (7:00–10:30 AM), Lunch (12:00–3:00 PM) and Dinner (7:00–10:00 PM), each with its own dishes, photos and prices.
-- **Cart & checkout** — the cart is kept in the browser (`localStorage`); only name and a 10-digit phone number are needed. Phone numbers are cleaned automatically (`+91`, `91-`, leading `0`).
-- **One meal per order** — a cart can't mix dishes from different meal times.
-- **Pre-orders** — if a meal's window has already passed, the order is automatically dated for tomorrow.
-- **Online payment (Razorpay)** — full payment up front. Confirmed by both the browser callback *and* a webhook, so a payment isn't lost if the tab is closed.
-- **Live token page** — the 4-digit token page refreshes every 5 seconds: `New → Preparing → Ready → Picked up`.
-- **Self-service cancellation** — customers can cancel while the order is still `New` (or `Out of stock`); the payment is refunded automatically.
-- **Daily limits** — popular dishes (Meals, Biriyani) are capped per day (75 by default); the app shows "only N left" or "sold out".
-- **Order limit** — a phone number can hold at most **2 open orders** at a time.
-- **Assistant chatbot** — a floating "E-Homely Assistant" that answers questions about the menu, timings, prices, payment, cancellation and location using live data from the database. It is rule-based (keyword matching), so it needs no external AI service.
-- **Responsive UI** — separate phone and desktop templates, chosen from screen width (with a user-agent fallback).
-- **About & Location pages**.
+### 👤 Customer Side
+- **Meal-wise Menu** — separate Breakfast (7–10:30 AM), Lunch (12–3 PM), and Dinner (7–10 PM) sections; dishes are shown only during their serving window
+- **Live Stock Check** — dishes marked out-of-stock by staff are hidden from the cart automatically
+- **Cart & Checkout** — browser-side cart persisted via `localStorage`; phone number normalisation (handles `91-` prefix, leading `0`, etc.)
+- **Online Payment** — full 100 % advance collected through **Razorpay**; payment confirmed by both callback and webhook so no payment is lost even if the tab closes
+- **Token Page** — after payment the customer receives a unique 4-digit token; the page polls the server every few seconds and updates the status live (New → Preparing → Ready → Picked Up)
+- **Order Cancellation** — customers can cancel their own order while it is still in `new` or `out_of_stock` status
+- **AI Butler Chatbot** — a conversational assistant that answers menu questions using live stock data
+- **About & Location Pages** — restaurant info and an embedded map/location view
 
-### Staff side
-- **Kitchen dashboard** (`/staff/`) — live list of paid, open orders; move them through `New → Preparing → Ready → Picked up`, or mark as `Cancelled` / `Out of stock`.
-- **Refunds** — cancelling an order refunds it; if Razorpay can't be reached, a **retry refund** button is available.
-- **Stock & menu management** (`/staff/menu/`) — toggle dishes in/out of stock and add new dishes with a photo.
-- **Django admin** (`/admin/`) — edit dishes, prices, daily limits, orders, and the site-wide **Accepting orders** switch.
+### 🍳 Staff Side
+- **Kitchen Dashboard** (`/staff/`) — live list of all open paid orders; staff can advance statuses (New → Preparing → Ready → Picked Up) or mark as Cancelled / Out-of-stock
+- **Menu Management** (`/staff/menu/`) — toggle individual dishes in/out of stock in real time
+- **Admin Panel** (`/admin/`) — full Django admin for dishes, orders, and site settings (e.g. open/close ordering site-wide)
 
 ---
 
@@ -34,43 +27,42 @@
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3, Django 4.2 |
-| Database | SQLite (switch to PostgreSQL for heavy production use) |
-| Payments | Razorpay (Orders API, refunds, webhook) |
-| Frontend | Django templates + vanilla HTML / CSS / JavaScript |
-| Static files | WhiteNoise |
-| Images | Pillow (uploaded dish photos are resized to 800 px and saved as WebP) |
-| Server / hosting | Gunicorn · Render (`build.sh` included) |
+| Backend | Python 3 · Django 4+ |
+| Database | SQLite (dev) — swap for PostgreSQL in production |
+| Payments | Razorpay (REST API + Webhook) |
+| Frontend | Vanilla HTML / CSS / JS (no framework) |
+| Hosting | Render / any WSGI host |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-E-Homely/
-├── backend/
+e-Homely-main/
+├── backend/                  ← Django (Python) code
 │   ├── manage.py
 │   ├── requirements.txt
-│   ├── build.sh                  # Render build script
-│   ├── .env.example              # template for environment variables
-│   ├── config/                   # settings, root URLs, wsgi/asgi
-│   └── orders/                   # the single Django app
-│       ├── models.py             # Dish, Order, OrderItem, SiteSetting
-│       ├── views.py              # customer + staff views, meal windows, limits
-│       ├── urls.py
-│       ├── payments.py           # Razorpay: create order, verify, webhook, refund
-│       ├── chatbot.py            # rule-based assistant
-│       ├── staff_auth.py         # staff-only login/logout
-│       ├── ui.py                 # phone vs. desktop template switching
-│       ├── admin.py
-│       ├── tests.py, test_flow.py
-│       ├── management/commands/attach_dish_images.py
-│       └── migrations/           # includes seed data for dishes and prices
-├── frontend/
-│   ├── templates/orders/         # phone templates
-│   │   └── desktop/              # laptop / large-screen templates
-│   └── static/orders/            # CSS, JS (cart, chatbot, nav), logo, favicons, hero image
-└── media/dishes/                 # dish photos and token images
+│   ├── build.sh              ← Render build script
+│   ├── db.sqlite3            ← dev database
+│   ├── config/               ← project settings & root URL conf
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   ├── wsgi.py
+│   │   └── asgi.py
+│   └── orders/               ← sole Django app
+│       ├── models.py         ← Dish, Order, OrderItem, SiteSetting
+│       ├── views.py          ← all customer & staff views
+│       ├── urls.py           ← URL routing
+│       ├── chatbot.py        ← AI butler chatbot logic
+│       ├── payments.py       ← Razorpay integration helpers
+│       ├── admin.py          ← Django admin configuration
+│       └── migrations/
+├── frontend/                 ← everything the browser receives
+│   ├── templates/orders/     ← HTML templates (base, home, menu, checkout, pay, token, staff, ...)
+│   │   └── desktop/          ← laptop/large-screen versions
+│   └── static/orders/        ← CSS, JS, logos, favicons, hero images
+└── media/
+    └── dishes/               ← dish photos (uploads from the admin land here)
 ```
 
 ---
@@ -78,21 +70,20 @@ E-Homely/
 ## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
-- Python 3.10 or newer
-- pip and Git
+- Python 3.10+
+- pip
 
-### 1. Clone the repository
+### 1. Clone the repo
 ```bash
-git clone https://github.com/anandhuuuuuuh/E-Homely.git
+git clone https://github.com/jerin-jaison/E-Homely.git
 cd E-Homely
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create & activate a virtual environment
 ```bash
 python -m venv .venv
-
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
+# Windows
+.venv\Scripts\activate
 # macOS / Linux
 source .venv/bin/activate
 ```
@@ -103,89 +94,47 @@ cd backend
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
-```bash
-# Windows
-copy .env.example .env
-# macOS / Linux
-cp .env.example .env
-```
-Open `backend/.env` and set at least `DJANGO_DEBUG=1` and a `DJANGO_SECRET_KEY`. The `.env` file is loaded automatically.
-
-### 5. Set up the database
+### 4. Apply migrations & create a superuser
 ```bash
 python manage.py migrate
+python manage.py createsuperuser
 ```
-The migrations also **seed the full menu** (breakfast, lunch, dinner) with prices, daily limits and photos, and create a default staff account (see [Staff login](#-staff-login)).
 
-### 6. Run the server
+### 5. Run the development server
 ```bash
+# Debug is off by default. Turn it on for local development:
+#   Windows PowerShell:  $env:DJANGO_DEBUG = "1"
+#   macOS / Linux:       export DJANGO_DEBUG=1
 python manage.py runserver
 ```
-- Customer site → http://127.0.0.1:8000/
-- Staff dashboard → http://127.0.0.1:8000/staff/
-- Django admin → http://127.0.0.1:8000/admin/ *(run `python manage.py createsuperuser` first)*
 
-> **Development payments:** with `DJANGO_DEBUG=1` and no Razorpay keys, checkout shows a **"Demo Pay"** button that simulates a successful payment, so you can test the whole flow without a Razorpay account. With debug off and no keys, online checkout is disabled.
+Visit **http://127.0.0.1:8000/** for the customer site and **http://127.0.0.1:8000/admin/** for the Django admin.
 
-### Run the tests
-```bash
-python manage.py test
-```
-The tests cover the full order flow: payment, webhook-before-browser, bad signatures, cancellation and refund, daily limits, order ownership, and pre-order dating.
+> **Note:** In development mode (`DJANGO_DEBUG=1`) Razorpay keys are not required. The checkout page shows a "Demo Pay" button that simulates a successful payment without hitting any real API.
 
 ---
 
 ## ⚙️ Environment Variables
 
-| Variable | Purpose | Notes |
-|---|---|---|
-| `DJANGO_SECRET_KEY` | Django secret key | **Required** when debug is off |
-| `DJANGO_DEBUG` | `1` = development, `0` = production | Defaults to `0` |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated hosts | Default `localhost,127.0.0.1,[::1]`; Render's host is added automatically |
-| `DJANGO_CSRF_ORIGINS` | Trusted HTTPS origins, e.g. `https://yourapp.onrender.com` | Optional |
-| `RAZORPAY_KEY_ID` | Razorpay API key ID | Empty = payments disabled / demo mode |
-| `RAZORPAY_KEY_SECRET` | Razorpay API key secret | |
-| `RAZORPAY_WEBHOOK_SECRET` | Webhook signing secret | |
+Set these in your hosting environment (e.g. Render → Environment tab):
 
-> 🔒 Never commit your real `.env` file. Only `.env.example` should be in version control.
+| Variable | Description | Default (dev) |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | Django secret key (required when debug is off) | dev value only when `DJANGO_DEBUG=1` |
+| `DJANGO_DEBUG` | `1` = debug on, `0` = production | `0` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | `localhost,127.0.0.1` (+ Render host automatically) |
+| `DJANGO_CSRF_ORIGINS` | Comma-separated trusted origins (HTTPS) | _(empty)_ |
+| `RAZORPAY_KEY_ID` | Razorpay live/test key ID | _(empty — disables payment)_ |
+| `RAZORPAY_KEY_SECRET` | Razorpay key secret | _(empty)_ |
+| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook signing secret | _(empty)_ |
 
 ---
 
 ## 💳 Razorpay Setup
 
-1. Create an account at [razorpay.com](https://razorpay.com) and generate keys under **Account & Settings → API Keys**.
-2. Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
-3. In the Razorpay dashboard, add a webhook pointing to `https://<your-domain>/payment/webhook/` and subscribe to **`payment.captured`** and **`order.paid`**.
-4. Copy the webhook secret into `RAZORPAY_WEBHOOK_SECRET`.
-
----
-
-## 🔑 Staff Login
-
-Staff sign in at `/staff/login/`. Only users with `is_staff` can enter.
-
-A fresh database comes with a default account created by a migration:
-
----
-
-## 🗺️ Order Flow
-
-```
-Customer picks dishes (one meal at a time)
-              ↓
-   Checkout: name + phone number
-              ↓
-   Pays the full amount via Razorpay
-              ↓
-   Token page: 4-digit token + live status
-              ↓
-   Kitchen: New → Preparing → Ready
-              ↓
-   Customer shows token at the counter → Picked up
-```
-
-*Cancelled before cooking starts? The amount is refunded automatically.*
+1. Sign up at [razorpay.com](https://razorpay.com) and get your API keys from **Account & Settings → API Keys**.
+2. Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` as environment variables.
+3. Create a webhook in the Razorpay dashboard pointing to `https://<your-domain>/payment/webhook/` and subscribe to the `payment.captured` event. Copy the **Webhook Secret** into `RAZORPAY_WEBHOOK_SECRET`.
 
 ---
 
@@ -193,69 +142,50 @@ Customer picks dishes (one meal at a time)
 
 | URL | Purpose |
 |---|---|
-| `/` | Welcome page |
-| `/home/` | Home — meal categories |
-| `/menu/<breakfast\|lunch\|dinner>/` | Dishes for a meal |
-| `/checkout/` | Checkout form |
-| `/pay/<id>/` | Payment page |
-| `/token/<id>/` · `/order/<id>/` | Token / order status page |
-| `/order/<id>/status/` | Status JSON (polled by the token page) |
-| `/order/<id>/cancel/` | Cancel an order (POST) |
-| `/chat/` | Chatbot endpoint (POST) |
-| `/stock/` | Live stock JSON |
-| `/about/` · `/location/` | Info pages |
-| `/payment/webhook/` | Razorpay webhook |
-| `/staff/login/` | Staff sign-in |
-| `/staff/` | Kitchen dashboard |
-| `/staff/menu/` | Stock and menu management |
+| `/` | Home — meal categories |
+| `/menu/<breakfast\|lunch\|dinner>/` | Per-meal dish list |
+| `/checkout/` | Cart checkout form |
+| `/pay/<pk>/` | Razorpay payment page |
+| `/order/<pk>/` | Token / order status page |
+| `/chatbot/` | AI butler chatbot |
+| `/about/` | About the restaurant |
+| `/location/` | Location / map page |
+| `/staff/` | Kitchen order dashboard (login required) |
+| `/staff/menu/` | Live stock toggle (login required) |
 | `/admin/` | Django admin |
 
 ---
 
-## ☁️ Deployment (Render)
+## 🗺️ Order Flow
 
-1. Create a **Web Service** from this repository with the root directory set to `backend`.
-2. **Build command:** `./build.sh` (installs requirements, collects static files, runs migrations).
-3. **Start command:** `gunicorn config.wsgi`
-4. Add the environment variables from the table above (`DJANGO_DEBUG=0`).
-5. Add the Razorpay webhook for your Render URL.
-
-> SQLite and the `media/` folder live on the server's disk, which is wiped on every deploy on Render's free tier. For real use, attach a persistent disk or move to PostgreSQL and external media storage.
-
----
-
-## 🧰 Useful Commands
-
-```bash
-# Attach photos from a folder to dishes with matching names (preview first)
-python manage.py attach_dish_images --dry-run
-python manage.py attach_dish_images --source "path/to/images"
-
-# Create an admin user
-python manage.py createsuperuser
 ```
-
----
-
-## 🛣️ Status & Roadmap
-
-- ✅ Menu, cart, Razorpay payments, token system, live status, refunds
-- ✅ Staff dashboard and stock control
-- ✅ Chatbot assistant
-- 🔜 Production database and persistent media storage
+Customer browses menu
+        ↓
+  Adds dishes to cart
+        ↓
+  Fills checkout form (name + phone)
+        ↓
+  Razorpay payment (100% advance)
+        ↓
+  Token page — 4-digit token shown
+        ↓
+  Kitchen updates status: New → Preparing → Ready
+        ↓
+  Customer collects order at counter
+```
 
 ---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m "Add your feature"`
-4. Push: `git push origin feature/your-feature`
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
 5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-Built for personal and educational use. Feel free to adapt it for your own canteen or mess.
+This project is for personal / educational use. Feel free to adapt it for your own canteen or mess.
