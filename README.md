@@ -167,8 +167,6 @@ Staff sign in at `/staff/login/`. Only users with `is_staff` can enter.
 
 A fresh database comes with a default account created by a migration:
 
-⚠️ **Change this password (or delete the account) before going live.** Create real staff users from the Django admin (`/admin/` → Users → tick *Staff status*).
-
 ---
 
 ## 🗺️ Order Flow
