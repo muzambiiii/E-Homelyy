@@ -13,10 +13,11 @@ Matching ignores case, spaces, underscores and hyphens, so
 "BEEF_GRAVY.jpeg" matches a dish named "Beef Gravy".
 """
 import re
-import shutil
 from pathlib import Path
 
 from django.conf import settings
+from django.core.files import File
+from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand, CommandError
 
 from orders.models import Dish
@@ -47,7 +48,6 @@ class Command(BaseCommand):
             raise CommandError(f'Folder not found: {source}')
 
         dry_run = options['dry_run']
-        dest_dir = Path(settings.MEDIA_ROOT) / 'dishes'
 
         # name key -> list of dishes with that name (e.g. same dish on breakfast and dinner)
         lookup = {}
@@ -70,10 +70,14 @@ class Command(BaseCommand):
             if dry_run:
                 self.stdout.write(f'Would attach: {f.name} -> {names}')
             else:
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy(f, dest_dir / f.name)   # copy the file once
+                # Save once via the storage API (local disk or S3, whichever
+                # STORAGES['default'] points at), then link every matching dish.
+                dest_name = f'dishes/{f.name}'
+                if not default_storage.exists(dest_name):
+                    with open(f, 'rb') as fh:
+                        default_storage.save(dest_name, File(fh))
                 for dish in dishes:                 # link it to every matching dish
-                    dish.image = f'dishes/{f.name}'
+                    dish.image = dest_name
                     dish.save(update_fields=['image'])
                 self.stdout.write(self.style.SUCCESS(f'Attached: {f.name} -> {names}'))
             matched += 1

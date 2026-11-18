@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     'orders',
 ]
 TIME_ZONE = 'Asia/Kolkata'
@@ -127,9 +128,29 @@ RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
 
-# Dish photos uploaded in the admin
-MEDIA_URL = '/media/'
-MEDIA_ROOT = PROJECT_ROOT / 'media'
+# Fake-pay path, independent of DEBUG. Lets a deployed site (DEBUG=0, secure
+# cookies on) demo checkout with no real Razorpay keys. Off by default: set
+# ALLOW_FAKE_PAYMENTS=1 only on a demo deploy, never on one taking real money.
+ALLOW_FAKE_PAYMENTS = DEBUG or os.environ.get('ALLOW_FAKE_PAYMENTS', '0') == '1'
+
+# Dish photos uploaded in the admin.
+# Local disk only when no AWS bucket set: Render's disk is ephemeral, so
+# production must use S3. Local dev untouched (no AWS_STORAGE_BUCKET_NAME).
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+if AWS_STORAGE_BUCKET_NAME:
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'ap-south-1')
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get('AWS_S3_CUSTOM_DOMAIN', '')  # optional CDN
+    AWS_DEFAULT_ACL = None          # bucket policy controls access, not per-object ACLs
+    AWS_QUERYSTRING_AUTH = False    # public bucket: plain URLs, no signed query params
+    AWS_S3_FILE_OVERWRITE = False
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3.S3Storage'}
+    domain = AWS_S3_CUSTOM_DOMAIN or f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    MEDIA_URL = f'https://{domain}/'
+else:
+    MEDIA_URL = '/media/'
+MEDIA_ROOT = PROJECT_ROOT / 'media'   # unused when S3 active, but urls.py always reads it
 WHITENOISE_AUTOREFRESH = DEBUG   # re-scan files on every request only while developing
 
 if RENDER_HOST:

@@ -346,7 +346,7 @@ def checkout(request):
                               'You already have 2 open orders. Please pick those up or cancel one first.',
                               name=name, phone=raw_phone, meal_window=meal_key, show_existing=True)
 
-    if not payments.keys_configured() and not settings.DEBUG:
+    if not payments.keys_configured() and not settings.ALLOW_FAKE_PAYMENTS:
         return checkout_error(request, 'Online payment is not set up yet. Please ask at the counter.',
                               name=name, phone=raw_phone)
 
@@ -374,7 +374,7 @@ def checkout(request):
             return checkout_error(request, 'We could not start the payment. '
                                   'Please try again in a minute.', name=name, phone=raw_phone)
         order.razorpay_order_id = rzp['id']
-    else:  # development "test mode" (DEBUG only)
+    else:  # fake-pay path (ALLOW_FAKE_PAYMENTS)
         order.razorpay_order_id = f'demo_{order.pk}'
     order.save(update_fields=['razorpay_order_id'])
 
@@ -426,8 +426,9 @@ def payment_verify(request):
 
 @require_POST
 def payment_demo(request, pk):
-    # Only for development with no Razorpay keys. Never works in production.
-    if payments.keys_configured() or not settings.DEBUG:
+    # Fake-pay path. Never works with real keys configured, or with
+    # ALLOW_FAKE_PAYMENTS off.
+    if payments.keys_configured() or not settings.ALLOW_FAKE_PAYMENTS:
         raise Http404
     order = get_object_or_404(Order, pk=pk)
     if not is_pending(request, pk):
