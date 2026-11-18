@@ -31,5 +31,15 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      - key: ALLOW_FAKE_PAYMENTS
+        value: "0"   # set to "1" on a demo deploy with no real Razorpay keys
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        value: "ap-south-1"
       - key: PYTHON_VERSION
         value: "3.12.7"
