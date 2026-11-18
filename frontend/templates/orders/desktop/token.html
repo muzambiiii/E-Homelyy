@@ -1,0 +1,154 @@
+{% extends 'orders/desktop/base.html' %}
+{% load static %}
+{% block title %}Your token | E-Homely{% endblock %}
+{% block extra_head %}<style>
+/* Laptop token page: a two-column "order confirmed" dashboard.
+   Left = what is happening with the order; right = the printable receipt with the token. */
+.dk{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:40px;align-items:start;padding:36px 0 56px}
+.dk *{box-sizing:border-box}
+.dk-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:var(--forest-light,#F3EAED);color:var(--forest,#3D1E2C);font:800 12px var(--body,sans-serif);letter-spacing:.12em;text-transform:uppercase}
+.dk-eyebrow::before{content:'\2713';display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--forest,#3D1E2C);color:#fff;font-size:11px}
+.dk h1{margin:14px 0 8px;font-size:clamp(36px,3.4vw,54px)}
+.dk h1 em{color:var(--gold,#BB8C3E);font-style:italic}
+.dk-lead{margin:0 0 26px;max-width:56ch;color:var(--muted,#6B6158);font-size:17px;line-height:1.55}
+
+.dk-panel{background:var(--paper,#fff);border:1px solid var(--line,#E3DBC4);border-radius:22px;box-shadow:var(--pop,0 6px 20px rgba(34,28,25,.06));padding:24px 28px;margin-bottom:18px}
+.dk-h{margin:0 0 14px;font:800 11.5px var(--body,sans-serif);letter-spacing:.14em;color:var(--muted,#6B6158);text-transform:uppercase}
+
+/* progress tracker */
+.tk-steps{display:grid;grid-template-columns:repeat(4,1fr);margin:6px 0 0;padding:0;list-style:none;counter-reset:s}
+.tk-steps li{position:relative;text-align:center;font:700 14px/1.2 var(--body,sans-serif);color:var(--subtle,#948B82)}
+.tk-steps li::before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:44px;height:44px;margin:0 auto 10px;border-radius:50%;background:#fff;border:2.5px solid var(--line-strong,#D6CDBC);color:var(--subtle,#948B82);font-size:16px;position:relative;z-index:1}
+.tk-steps li::after{content:'';position:absolute;top:21px;left:calc(50% + 24px);right:calc(-50% + 24px);height:3px;border-radius:2px;background:var(--line-strong,#D6CDBC)}
+.tk-steps li:last-child::after{display:none}
+.tk-steps li.done{color:var(--forest,#3D1E2C)}.tk-steps li.done::before{content:'\2713';background:var(--forest,#3D1E2C);border-color:var(--forest,#3D1E2C);color:#fff}
+.tk-steps li.done::after{background:var(--forest,#3D1E2C)}
+.tk-steps li.now{color:var(--forest,#3D1E2C)}.tk-steps li.now::before{background:var(--gold-lt,#E9CB86);border-color:var(--forest,#3D1E2C);color:#221C19;box-shadow:0 0 0 6px rgba(187,140,62,.22)}
+.tk-state{display:flex;align-items:center;gap:10px;margin:22px 0 0;font:700 22px var(--display,Georgia,serif);color:var(--forest,#3D1E2C)}
+.tk-state i{width:11px;height:11px;border-radius:50%;background:var(--gold,#BB8C3E);animation:tkp 1.6s infinite}
+@keyframes tkp{50%{opacity:.3}}
+.tk-msg{margin:6px 0 0;font-size:15px;color:var(--muted,#6B6158)}.tk-msg:empty{display:none}
+.tk-alert .tk-state{color:var(--spice,#AD4B29)}.tk-alert .tk-state i{background:var(--spice,#AD4B29);animation:none}
+.tk-alert .tk-steps{display:none}
+.tk-refund{margin:12px 0 0;padding:10px 14px;border-radius:12px;background:#F3EAED;color:#58283B;font-weight:700;font-size:14px}
+
+/* info tiles */
+.dk-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.dk-tile{padding:16px 18px;border-radius:18px;background:var(--paper,#fff);border:1px solid var(--line,#E3DBC4)}
+.dk-tile small{display:block;font:700 11px var(--body,sans-serif);letter-spacing:.12em;color:var(--subtle,#948B82);text-transform:uppercase}
+.dk-tile strong{display:block;margin-top:4px;font-size:17px;color:var(--ink,#221C19)}
+.dk-tile span{display:block;margin-top:2px;font-size:13px;color:var(--muted,#6B6158)}
+.dk-tile.live{background:#F3EAED;border-color:#D9B9BD}
+.dk-tile.pre{background:var(--gold-soft,#FBF4E3);border-color:#ecd9a8}
+
+/* buttons */
+.dk-actions{display:flex;flex-wrap:wrap;gap:12px}
+.dk-actions form{margin:0}.dk-actions form[hidden]{display:none}
+.dk-btn{padding:13px 26px;font-size:15px}
+.dk-btn.light{background:#fff;color:var(--forest,#3D1E2C);border:1.5px solid var(--forest,#3D1E2C);box-shadow:none}
+.dk-btn.light:hover{background:var(--forest-light,#F3EAED);color:var(--forest,#3D1E2C);box-shadow:none}
+.dk-btn.danger{background:#fff;color:#b3341f;border:1.5px solid #e3b4ab;box-shadow:none}
+.dk-btn.danger:hover{background:#fbeae6;color:#8f2616;box-shadow:none}
+
+/* receipt */
+.dk-side{position:sticky;top:calc(var(--nav,72px) + 20px)}
+.rc{position:relative;border-radius:24px;background:var(--forest-dark,#26121B);color:#fff;box-shadow:var(--shadow-lg,0 22px 60px rgba(34,28,25,.12));overflow:hidden}
+.rc-top{display:flex;align-items:center;justify-content:space-between;padding:18px 24px}
+.rc-brand{display:flex;align-items:center;gap:10px;font:700 16px var(--display,Georgia,serif);letter-spacing:.1em}
+.rc-brand img{width:36px;height:36px;border-radius:50%;background:#fff;padding:2px}
+.rc-tag{padding:4px 12px;border-radius:999px;background:var(--gold-lt,#E9CB86);color:#221C19;font:800 11px var(--body,sans-serif);letter-spacing:.1em}
+.rc-no{text-align:center;padding:10px 24px 22px}
+.rc-no small{display:block;font:700 11.5px var(--body,sans-serif);letter-spacing:.2em;color:#CCB6BE}
+.rc-no b{display:block;margin:6px 0 10px;font:700 92px/1 var(--display,Georgia,serif);letter-spacing:.12em;margin-right:-.12em;color:var(--gold-lt,#E9CB86)}
+.rc-copy{padding:8px 20px;font-size:13px;background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.45);box-shadow:none}
+.rc-copy:hover{background:rgba(255,255,255,.12);color:#fff;box-shadow:none}
+.rc-body{position:relative;background:#fff;color:var(--ink,#221C19);padding:22px 24px 20px}
+.rc-body::before{content:'';position:absolute;left:14px;right:14px;top:-1px;border-top:2px dashed var(--line-strong,#D6CDBC)}
+.rc-body::after{content:'';position:absolute;left:-14px;right:-14px;top:-15px;height:28px;background:radial-gradient(circle 14px at 0 14px,var(--forest-dark,#26121B) 98%,transparent 100%) left/50% 100% no-repeat,radial-gradient(circle 14px at 100% 14px,var(--forest-dark,#26121B) 98%,transparent 100%) right/50% 100% no-repeat;pointer-events:none}
+.rc-meta{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;font-size:13px}
+.rc-meta small{display:block;font:700 10.5px var(--body,sans-serif);letter-spacing:.1em;color:var(--subtle,#948B82);text-transform:uppercase}
+.rc-meta strong{font-size:15px}.rc-meta div:last-child{text-align:right}
+.rc-items{width:100%;border-collapse:collapse;font-size:14.5px}
+.rc-items td{padding:8px 0;border-bottom:1px solid var(--line,#E3DBC4);vertical-align:top}
+.rc-items td:last-child{text-align:right;white-space:nowrap;font-weight:700}
+.rc-items small{display:block;color:var(--subtle,#948B82);font-weight:500;font-size:12.5px}
+.rc-row{display:flex;justify-content:space-between;padding:5px 0;font-size:14.5px;color:var(--muted,#6B6158)}.rc-row strong{color:var(--ink,#221C19)}
+.rc-due{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding:14px 16px;border-radius:14px;background:var(--terracotta-soft,#FBECE7);color:var(--terracotta,#AD4B29);font-weight:800}
+.rc-due b{font:800 28px var(--display,Georgia,serif)}
+.rc-bar{height:38px;margin:16px 0 4px;opacity:.85;background:repeating-linear-gradient(90deg,#221C19 0 2px,transparent 2px 5px,#221C19 5px 6px,transparent 6px 10px,#221C19 10px 13px,transparent 13px 16px)}
+.rc-foot{text-align:center;font:700 11px var(--body,sans-serif);letter-spacing:.16em;color:var(--subtle,#948B82)}
+@media(max-width:1100px){.dk{grid-template-columns:1fr;gap:28px}.dk-side{position:static;max-width:520px}}
+@media(max-width:760px){.dk-tiles{grid-template-columns:1fr}}
+</style>{% endblock %}
+{% block content %}
+{% url 'cancel_order' order.pk as cancel_url %}
+{% url 'menu' as menu_url %}
+<div class="wrap dk" id="tk">
+  <div class="dk-main" id="tk-card">
+    <span class="dk-eyebrow">Order confirmed &middot; paid</span>
+    <h1>Thank you, {{ order.name|truncatechars:24 }}. <em>Your food is on its way.</em></h1>
+    <p class="dk-lead">Your advance is paid and your token is ready. Show the number at the counter whenever you arrive &mdash; it never expires.</p>
+
+    <section class="dk-panel">
+      <p class="dk-h">Live order status</p>
+      <ol class="tk-steps" id="tk-steps" aria-label="Order progress">
+        <li data-s="new">Received</li><li data-s="preparing">Preparing</li><li data-s="ready">Ready</li><li data-s="picked_up">Collected</li>
+      </ol>
+      <p class="tk-state"><i></i><span id="status">{{ order.get_status_display }}</span></p>
+      <p class="tk-msg" id="msg"></p>
+      <p class="tk-refund" id="refundmsg" {% if not refunded %}hidden{% endif %}>Your advance has been refunded.</p>
+    </section>
+
+    <div class="dk-tiles">
+      {% if meal_label %}
+      <div class="dk-tile{% if meal_state == 'open' %} live{% elif for_tomorrow %} pre{% endif %}">
+        <small>Meal</small><strong>{{ meal_label }}</strong>
+        <span>{% if meal_state == 'open' %}Serving now{% elif for_tomorrow %}Pre-order for tomorrow{% elif meal_state == 'later' %}Collect today{% else %}Served daily{% endif %}</span>
+      </div>
+      <div class="dk-tile{% if for_tomorrow %} pre{% endif %}">
+        <small>Collect</small><strong>{% if for_tomorrow %}Tomorrow{% else %}Today{% endif %}</strong>
+        <span>{{ meal_start }} &ndash; {{ meal_end }}</span>
+      </div>
+      {% endif %}
+      <div class="dk-tile"><small>Placed</small><strong>{{ order.created|date:"g:i A" }}</strong><span>{{ order.created|date:"j M Y" }}</span></div>
+    </div>
+
+    <div class="dk-actions">
+      <form id="cancel-form" method="post" action="{{ cancel_url }}" {% if not can_cancel %}hidden{% endif %}>
+        {% csrf_token %}
+        <button type="button" class="dk-btn danger" id="tk-cancel">Cancel order</button>
+      </form>
+      <a class="btn dk-btn" href="{{ menu_url }}">Back to meals</a>
+    </div>
+  </div>
+
+  <aside class="dk-side" aria-label="Receipt">
+    <div class="rc">
+      <div class="rc-top">
+        <span class="rc-brand"><img src="{% static 'orders/logo.svg' %}" alt="" width="36" height="36">E-HOMELY</span>
+        <span class="rc-tag">PICKUP TOKEN</span>
+      </div>
+      <div class="rc-no">
+        <small>YOUR TOKEN NUMBER</small>
+        <b id="tk-no">{{ order.order_no }}</b>
+        <button type="button" class="rc-copy" id="tk-copy">Copy token</button>
+      </div>
+      <div class="rc-body">
+        <div class="rc-meta"><div><small>Order for</small><strong>{{ order.name }}</strong></div><div><small>Paid online</small><strong>&#8377;{{ order.advance_amount|floatformat:"-2" }}</strong></div></div>
+        <table class="rc-items">
+          {% for i in items %}
+          <tr><td>{{ i.dish.name }}<small>&#8377;{{ i.price|floatformat:"-2" }} &times; {{ i.quantity }}</small></td><td>&#8377;{{ i.line_total|floatformat:"-2" }}</td></tr>
+          {% endfor %}
+        </table>
+        <div style="margin-top:10px">
+          <div class="rc-row"><span>Total</span><strong>&#8377;{{ order.total|floatformat:"-2" }}</strong></div>
+          <div class="rc-due"><span>PAY AT COUNTER</span><b>&#8377;{{ order.balance|floatformat:"-2" }}</b></div>
+        </div>
+        <div class="rc-bar" aria-hidden="true"></div>
+        <div class="rc-foot">GOOD FOOD &middot; GOOD COMPANY &middot; NO EXPIRY</div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% include 'orders/_token_js.html' %}
+{% endblock %}

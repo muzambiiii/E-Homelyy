@@ -1,0 +1,99 @@
+{% url 'order_status' order.pk as status_url %}
+<style>
+/* confirm dialog */
+.tk-modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(38,18,27,.55)}
+.tk-modal.open{display:flex}
+.tk-dlg{width:100%;max-width:380px;padding:22px;border-radius:18px;background:#fff;box-shadow:0 24px 60px rgba(0,0,0,.35);text-align:center}
+.tk-dlg h3{margin:0 0 6px;font-size:22px}.tk-dlg p{margin:0 0 16px;color:var(--muted,#6B6158);font-size:14px}
+.tk-dlg .tk-btn+.tk-btn{margin-top:8px}
+.tk-dlg .tk-btn.red{background:#b3341f;color:#fff;border:0}.tk-dlg .tk-btn.red:hover{background:#8f2616}
+.tk-dlg .tk-btn{display:flex;width:100%;justify-content:center;padding:13px 18px;font-size:15px}
+.tk-dlg .tk-btn.light{background:#fff;color:var(--forest,#3D1E2C);border:1.5px solid var(--forest,#3D1E2C);box-shadow:none}
+.tk-dlg .tk-btn.light:hover{background:var(--forest-light,#F3EAED);box-shadow:none}
+</style>
+<div class="tk-modal" id="tk-modal" role="dialog" aria-modal="true" aria-labelledby="tk-mt">
+  <div class="tk-dlg">
+    <h3 id="tk-mt">Cancel this order?</h3>
+    <p>Your advance will be refunded automatically.</p>
+    <button type="button" class="tk-btn red" id="tk-yes">Yes, cancel order</button>
+    <button type="button" class="tk-btn light" id="tk-no-btn">Keep my order</button>
+  </div>
+</div>
+
+<script>
+  // A bfcache-restored page can carry a stale CSRF token and status, so reload it for real.
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
+  try { localStorage.removeItem('cart'); } catch (e) {}
+  let status = '{{ order.status }}';
+  const ORDER = ['new', 'preparing', 'ready', 'picked_up'];
+  const messages = {
+    new: 'We have your order. The kitchen will start soon.',
+    preparing: 'The kitchen is cooking your food.',
+    out_of_stock: 'Sorry, something in your order is sold out. Please ask at the counter to swap it or refund the advance.',
+    ready: 'Your order is ready. Please collect it from the counter.',
+    cancelled: 'This order was cancelled.',
+    picked_up: 'Collected. Enjoy your meal!',
+  };
+  const $ = id => document.getElementById(id);
+  function keepToken() {
+    try {
+      if (status === 'picked_up' || status === 'cancelled') localStorage.removeItem('tokenUrl');
+      else localStorage.setItem('tokenUrl', '{{ request.path }}');
+    } catch (e) {}
+  }
+  function paintSteps() {
+    const idx = ORDER.indexOf(status);
+    $('tk-steps').querySelectorAll('li').forEach((li, i) => {
+      li.classList.toggle('done', idx > i || status === 'picked_up');
+      li.classList.toggle('now', idx === i && status !== 'picked_up');
+    });
+    $('tk-card').classList.toggle('tk-alert', idx < 0);
+  }
+  keepToken(); paintSteps(); $('msg').textContent = messages[status] || '';
+
+  async function refresh() {
+    try {
+      const res = await fetch('{{ status_url }}', {credentials: 'same-origin'});
+      if (!res.ok) return;
+      const data = await res.json();
+      status = data.status;
+      $('status').textContent = data.label;
+      $('msg').textContent = messages[data.status] || '';
+      $('cancel-form').hidden = !data.can_cancel;
+      $('refundmsg').hidden = !data.refunded;
+      paintSteps(); keepToken();
+    } catch (e) {}
+  }
+  refresh(); setInterval(refresh, 5000);
+
+  // Copy token
+  $('tk-copy').addEventListener('click', async () => {
+    const t = $('tk-no').textContent.trim(), b = $('tk-copy');
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) {
+      const r = document.createRange(); r.selectNodeContents($('tk-no'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      try { document.execCommand('copy'); } catch (e2) {}
+      s.removeAllRanges();
+    }
+    b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = 'Copy token'; }, 1600);
+  });
+
+  // Cancel order: in-page confirm, then POST without leaving the page (falls back to a normal form post).
+  const modal = $('tk-modal'), form = $('cancel-form');
+  const close = () => modal.classList.remove('open');
+  $('tk-cancel').addEventListener('click', () => { modal.classList.add('open'); $('tk-no-btn').focus(); });
+  $('tk-no-btn').addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  $('tk-yes').addEventListener('click', async () => {
+    const yes = $('tk-yes'); yes.disabled = true; yes.textContent = 'Cancelling...';
+    try {
+      const res = await fetch(form.action, {method: 'POST', body: new FormData(form), credentials: 'same-origin'});
+      if (!res.ok) throw new Error('bad status');
+      close(); await refresh();
+    } catch (e) { form.submit(); return; }
+    yes.disabled = false; yes.textContent = 'Yes, cancel order';
+  });
+</script>

@@ -1,0 +1,55 @@
+{% if ui_check %}<script>
+// Picks the laptop or phone layout from the REAL screen width (>= 1024px = laptop).
+// Safe by design: it can never reload in a loop, it waits while someone is typing,
+// and it ignores tiny resize jitters (address bar, keyboard, rotating).
+(function () {
+  var mq = window.matchMedia('(min-width:1024px)');
+  var have = '{{ is_desktop|yesno:"desktop,phone" }}';
+  var timer = null;
+
+  function want() { return mq.matches ? 'desktop' : 'phone'; }
+  function setCookie() {
+    document.cookie = 'ui=' + want() + ';path=/;max-age=31536000;samesite=lax';
+  }
+  function typing() {
+    var a = document.activeElement;
+    return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  }
+  function tries() {
+    try { return parseInt(sessionStorage.getItem('uiReload'), 10) || 0; } catch (e) { return 0; }
+  }
+  function sync() {
+    setCookie();
+    if (want() === have) {
+      try { sessionStorage.removeItem('uiReload'); } catch (e) { }
+      return;
+    }
+    if (typing()) return;            // never wipe a half-filled form
+    if (tries() >= 2) return;        // cookies blocked? stop, never loop
+    try { sessionStorage.setItem('uiReload', String(tries() + 1)); } catch (e) { }
+    location.replace(location.href);
+  }
+
+  setCookie();
+  sync();
+
+  function onChange() {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      try { sessionStorage.removeItem('uiReload'); } catch (e) { }
+      sync();
+    }, 350);
+  }
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
+  // Back/Forward can restore a frozen copy of the page. If the screen size changed while it
+  // was away (rotated phone, resized window), re-check which layout it should be.
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    try { sessionStorage.removeItem('uiReload'); } catch (err) { }
+    sync();
+  });
+  // If a form was being filled when the screen changed, switch as soon as they leave it.
+  document.addEventListener('focusout', function () { setTimeout(function () { if (want() !== have) onChange(); }, 50); });
+})();
+</script>{% endif %}

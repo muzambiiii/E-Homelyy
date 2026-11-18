@@ -1,0 +1,20 @@
+{# Coordinates come from the embedded map's own pin, so these links always open the right place. #}
+{% with lat="10.0132200" lng="76.6022601" %}
+<div class="loc-page">
+  <h1>Our Location</h1>
+  <p class="loc-addr">Homely Kitchen Canteen, near YMBC block, Kothamangalam</p>
+
+  <div class="loc-map">
+    <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d269.8659815207431!2d76.60226007602468!3d10.013219997909992!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b07e7b31266db77%3A0xb6a201cfa6886bee!2sHomely%20Kitchen%20Canteen!5e1!3m2!1sen!2sin!4v1794816776118!5m2!1sen!2sin"
+            allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+            title="Homely Kitchen Canteen map"></iframe>
+  </div>
+
+  <div class="loc-actions">
+    <a class="loc-btn" href="https://www.google.com/maps/search/?api=1&amp;query={{ lat }},{{ lng }}" target="_blank" rel="noopener">Open in Google Maps</a>
+    <a class="loc-btn alt" href="https://www.google.com/maps/dir/?api=1&amp;destination={{ lat }},{{ lng }}" target="_blank" rel="noopener">Get directions</a>
+    <a class="loc-btn alt" href="tel:+919074092355">Call us</a>
+  </div>
+  <p class="loc-note">Map not showing? Use <strong>Open in Google Maps</strong> above.</p>
+</div>
+{% endwith %}

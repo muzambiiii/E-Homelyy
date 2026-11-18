@@ -1,0 +1,248 @@
+{% extends 'orders/desktop/base.html' %}
+{% load static %}
+{% block title %}E-Homely | Home-style Food, Ready When You Are{% endblock %}
+{% block bodyclass %}desktop-home{% endblock %}
+
+{% block content %}
+{% if show_landing %}
+{# ==================== WEBPAGE 0: LANDING SPLASH ==================== #}
+<section class="d-screen d-landing">
+  <div class="d-landing-rings" aria-hidden="true"><i></i><i></i></div>
+  <div class="wrap d-landing-inner">
+    <span class="eyebrow">Welcome to</span>
+    <h1>E-Homely</h1>
+    <div class="d-landing-rule" aria-hidden="true"></div>
+    <p class="lead">Home-style Kerala meals, ready when you are.</p>
+  </div>
+  <a class="d-landing-scroll" href="#home" aria-label="Scroll to homepage">
+    <span>Scroll down</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+  </a>
+</section>
+{% endif %}
+
+{# ==================== WEBPAGE 1: HERO (framed image + editorial) ==================== #}
+<section class="d-screen d-screen-1" id="home">
+
+  {# Left: text column, with CTA + kitchen status pinned to its bottom. Right: framed photo #}
+  <div class="wrap d-hero-row">
+
+    <div class="d-hero-left">
+      <div class="d-hero-text">
+        <h1>Traditional Kerala Life,<br>Preserved</h1>
+        <div class="d-hero-rule" aria-hidden="true"></div>
+        <p class="lead">
+          Step into a world of unhurried home cooking — the kind passed down through generations,
+          prepared fresh every morning in a tiled-roof kitchen surrounded by jackfruit and coconut trees.
+          Order ahead, pay a small advance, and collect hot at the counter.
+        </p>
+      </div>
+
+      {# Pinned to the bottom of the left column: button sits just above the kitchen-open status #}
+      <div class="d-hero-left-bottom">
+        <a class="btn btn-hero" href="#meals">View our meals &darr;</a>
+        <div class="kitchen-badge" id="kitchenBadge">
+          <span class="badge-dot"></span>
+          <span id="kitchenBadgeText">Checking…</span>
+        </div>
+        <p class="hero-status-note" id="heroStatusNote"></p>
+      </div>
+    </div>
+
+    <div class="d-hero-frame-wrap">
+      <div class="d-hero-frame-mat">
+        <img
+          class="d-hero-frame-img"
+          src="{% static 'orders/hero-desktop.png' %}"
+          alt="E-Homely — a traditional Kerala thatched-roof restaurant surrounded by jackfruit and coconut trees"
+          fetchpriority="high"
+          decoding="async"
+        >
+      </div>
+    </div>
+
+  </div>
+
+  {# Clock strip, full width at the very foot of the screen #}
+  <div class="wrap d-hero-bottombar">
+    <div class="d-nowstrip">
+      <div class="d-nowstrip-inner">
+        <div>
+          <div class="d-clock" id="clock">--:--:--</div>
+          <p class="d-clockdate" id="clockdate">Loading IST…</p>
+        </div>
+        <div class="d-nowstrip-divider" aria-hidden="true"></div>
+        <div>
+          <p class="d-nowtitle" id="nowtitle">Checking the kitchen…</p>
+          <p class="d-nowline" id="nowline"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+{# ==================== WEBPAGE 2: THE 3 MEALS ==================== #}
+<section class="d-screen d-screen-2" id="meals">
+  <div class="wrap d-meals-wrap">
+    <div class="d-meals-head">
+      <h2>Choose your meal.</h2>
+      <p class="lead">Browse any menu anytime. Pre-orders are accepted while that meal is being served.</p>
+    </div>
+
+    {% if not accepting %}
+    <p class="closed-note" style="margin-bottom:20px">We are not taking pre-orders right now. Please check back soon.</p>
+    {% endif %}
+
+    <div class="d-meals-grid">
+      {% for m in meals %}
+      <div class="d-meal-card" id="card-{{ m.key }}">
+        <div class="d-meal-top">
+          <span class="badge" id="badge-{{ m.key }}">Checking…</span>
+          <span class="d-meal-time">{{ m.start_label }} to {{ m.end_label }}</span>
+        </div>
+        <h3>{{ m.label }}</h3>
+        <p class="d-meal-blurb">{{ m.blurb }}</p>
+        <div class="d-meal-foot">
+          <span class="d-meal-msg" id="msg-{{ m.key }}">Checking…</span>
+          <a class="btn btn-primary d-meal-btn" id="btn-{{ m.key }}" href="{% url 'meal_menu' m.key %}">View {{ m.label|lower }} &rarr;</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{{ meals|json_script:'meals-data' }}
+<script>
+  const meals = JSON.parse(document.getElementById('meals-data').textContent);
+  const TZ = 'Asia/Kolkata';
+  const clockFmt  = new Intl.DateTimeFormat('en-US', {timeZone:TZ, hour:'numeric', minute:'2-digit', second:'2-digit', hour12:true});
+  const dateFmt   = new Intl.DateTimeFormat('en-GB', {timeZone:TZ, weekday:'short', day:'numeric', month:'short'});
+  const partsFmt  = new Intl.DateTimeFormat('en-GB', {timeZone:TZ, hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'});
+  function istMinutes(d) {
+    const p = {}; partsFmt.formatToParts(d).forEach(x => { p[x.type] = x.value; });
+    return Number(p.hour)*60 + Number(p.minute) + Number(p.second)/60;
+  }
+  const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const fmt = t => { const [h,m] = t.split(':').map(Number); return (h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM'); };
+  const dur = mins => { const t=Math.max(1,Math.round(mins)),h=Math.floor(t/60),m=t%60; return h?(m?`${h}h ${m}m`:`${h}h`):`${m}m`; };
+
+  function tick() {
+    const now = new Date();
+    const cur = istMinutes(now);
+    const clockEl = document.getElementById('clock');
+    const dateEl  = document.getElementById('clockdate');
+    if (clockEl) clockEl.textContent = clockFmt.format(now);
+    if (dateEl)  dateEl.textContent  = dateFmt.format(now);
+
+    let live = null, next = null, nextIn = Infinity, tomorrow = false;
+    meals.forEach(m => {
+      const s = toMin(m.start), e = toMin(m.end);
+      const isOpen = cur >= s && cur < e;
+      if (isOpen) live = {m, left: e - cur};
+      let d = s - cur, tm = false;
+      if (d <= 0) { d += 1440; tm = true; }
+      if (d < nextIn) { nextIn = d; next = m; tomorrow = tm; }
+
+      const card = document.getElementById('card-' + m.key);
+      if (card) {
+        card.classList.toggle('live', isOpen);
+        const badge = document.getElementById('badge-' + m.key);
+        const msg   = document.getElementById('msg-'   + m.key);
+        const btn   = document.getElementById('btn-'   + m.key);
+        if (isOpen) {
+          if (badge) { badge.textContent = 'Serving now'; badge.className = 'badge live'; }
+          if (msg)   msg.textContent = (e-cur<=15) ? `Closes in ${Math.ceil(e-cur)} min` : `Open until ${fmt(m.end)}`;
+          if (btn)   btn.textContent = `Order ${m.label} now →`;
+        } else {
+          const passed = cur >= toMin(m.end);
+          if (badge) { badge.textContent = passed ? 'Pre-order for tomorrow' : 'Closed'; badge.className = 'badge'; }
+          if (msg)   msg.textContent = (cur < toMin(m.start)) ? `Opens at ${fmt(m.start)}` : `Pre-order now, collect tomorrow at ${fmt(m.start)}`;
+          if (btn)   btn.textContent = passed ? `Pre-order ${m.label} for tomorrow →` : `View ${m.label} menu →`;
+        }
+      }
+    });
+
+    const badge = document.getElementById('kitchenBadge');
+    const badgeText = document.getElementById('kitchenBadgeText');
+    const note  = document.getElementById('heroStatusNote');
+    if (badge && badgeText) {
+      if (live) {
+        badge.className = 'kitchen-badge open';
+        badgeText.textContent = 'Kitchen Open';
+        if (note) note.textContent = `${live.m.label} is being served until ${fmt(live.m.end)} (${dur(live.left)} left).`;
+      } else {
+        badge.className = 'kitchen-badge closed';
+        badgeText.textContent = 'Kitchen Closed';
+        if (note) note.textContent = next ? `Next: ${next.label} ${tomorrow ? 'tomorrow at' : 'at'} ${fmt(next.start)} (in ${dur(nextIn)}).` : '';
+      }
+    }
+
+    const nowtitle = document.getElementById('nowtitle');
+    const nowline  = document.getElementById('nowline');
+    if (nowtitle && nowline) {
+      if (live) {
+        nowtitle.textContent = `${live.m.label} is being served now`;
+        nowline.textContent  = `Open until ${fmt(live.m.end)} · ${dur(live.left)} remaining`;
+      } else if (next) {
+        nowtitle.textContent = `Up next: ${next.label}`;
+        nowline.textContent  = `Starts ${tomorrow ? 'tomorrow at' : 'at'} ${fmt(next.start)} (in ${dur(nextIn)})`;
+      }
+    }
+  }
+  tick(); setInterval(tick, 1000);
+</script>
+{% endblock %}
+
+{# ==================== WEBPAGE 3: FOOTER ==================== #}
+{% block footer %}
+{% with phone="90740 92355" phone_intl="919074092355" address="Near YMBC Media block, Kothamangalam" %}
+<footer class="d-screen d-screen-3" id="contact">
+  <div class="wrap d-foot-wrap">
+    <div class="d-foot-grid">
+      <div class="d-foot-col">
+        <div class="t-brand-wrap" style="margin-bottom:12px">
+          <img class="token-logo" src="{% static 'orders/logo.svg' %}" alt="E-Homely" width="34" height="34">
+          <span class="t-brand" style="color:#FFFDF9;font-size:17px">E-HOMELY</span>
+        </div>
+        <p class="d-foot-lead">Simple, filling South Indian meals cooked the way they are made at home. Order ahead from your laptop or phone, skip the counter queue, and eat well every day.</p>
+        <p class="d-foot-meta">Pay a small advance online &bull; Collect fresh with token &bull; No token expiry</p>
+      </div>
+      <div class="d-foot-col">
+        <h3 class="d-foot-title">How it works</h3>
+        <ol class="d-foot-steps">
+          <li><strong>01. Pick a meal</strong><span>Choose Breakfast, Lunch, or Dinner &amp; add your favorite dishes.</span></li>
+          <li><strong>02. Pay small advance</strong><span>Pay online securely via UPI or Card for an instant pickup token.</span></li>
+          <li><strong>03. Collect &amp; enjoy</strong><span>Show token at counter and pay balance when you collect.</span></li>
+        </ol>
+      </div>
+      <div class="d-foot-col">
+        <h3 class="d-foot-title">Visit &amp; Contact</h3>
+        <p class="d-foot-addr">{{ address }}</p>
+        <div class="d-foot-acts">
+          <a class="btn gold" title="Call" aria-label="Call" href="tel:+{{ phone_intl }}">
+            <svg class="ico" aria-hidden="true"><use href="#ico-phone"/></svg><span class="sr">Call</span>
+          </a>
+          <a class="btn loc" title="Location" aria-label="Location" href="{% url 'location' %}">
+            <svg class="ico" aria-hidden="true"><use href="#ico-pin"/></svg><span class="sr">Location</span>
+          </a>
+          <a class="btn wa" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/{{ phone_intl }}" target="_blank" rel="noopener">
+            <svg class="ico" aria-hidden="true"><use href="#ico-whatsapp"/></svg><span class="sr">WhatsApp</span>
+          </a>
+        </div>
+        <ul class="d-foot-hours">
+          {% for m in meals %}
+          <li><span>{{ m.label }}</span><strong>{{ m.start_label }} – {{ m.end_label }}</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="d-foot-bar">
+      <span>&copy; E-Homely &bull; Authentic Home-Style Mess</span>
+      <a href="#home" class="d-foot-top">Back to top &uarr;</a>
+    </div>
+  </div>
+</footer>
+{% endwith %}
+{% endblock %}

@@ -1,0 +1,92 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24101a">
+  <title>Welcome to E-Homely</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'orders/favicon.svg' %}">
+  <link rel="alternate icon" href="{% static 'orders/favicon.png' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --plum-0:#1C0D14; --plum-1:#3D1E2C; --plum-2:#26121B; --glow:#4e2c28;
+      --gold:#BB8C3E; --gold-lt:#E9CB86; --blush:#d9b9bd; --ring:rgba(200,147,58,.16);
+    }
+    *{box-sizing:border-box;margin:0}
+    html,body{height:100%}
+    body{
+      min-height:100vh;min-height:100svh;overflow:hidden;position:relative;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      padding:clamp(24px,6vh,64px) 24px calc(clamp(24px,6vh,64px) + 44px);
+      font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff;
+      background:
+        radial-gradient(ellipse 65% 55% at 50% 34%, rgba(200,147,58,.16) 0%, transparent 62%),
+        linear-gradient(165deg,#1C0D14 0%,#3D1E2C 55%,#26121B 100%);
+      opacity:1;transition:opacity .55s ease, transform .55s ease;
+    }
+    body.leaving{opacity:0;transform:scale(1.03)}
+    /* thin decorative rings behind the title */
+    .rings{position:absolute;left:50%;top:38%;width:0;height:0;pointer-events:none}
+    .rings i{position:absolute;border:1px solid var(--ring);border-radius:50%;transform:translate(-50%,-50%)}
+    .rings i:nth-child(1){width:min(78vmin,600px);height:min(78vmin,600px)}
+    .rings i:nth-child(2){width:min(64vmin,500px);height:min(64vmin,500px)}
+    main{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;width:100%}
+    .eyebrow{font-weight:700;font-size:clamp(11px,1.1vw,14px);letter-spacing:.42em;text-indent:.42em;color:var(--gold);text-transform:uppercase}
+    h1{font:700 clamp(54px,9vw,104px)/1.05 'Playfair Display',Georgia,serif;margin:clamp(10px,2vh,22px) 0 clamp(14px,2.4vh,26px);letter-spacing:-.01em}
+    .rule{width:58px;height:1px;background:var(--gold)}
+    .tag{font:italic 500 clamp(17px,1.9vw,24px)/1.4 'Playfair Display',Georgia,serif;color:var(--blush);margin-top:clamp(16px,2.8vh,30px);max-width:32ch}
+    .enter{
+      margin-top:clamp(64px,15vh,150px);display:inline-flex;align-items:center;gap:10px;
+      padding:15px 42px;border-radius:999px;border:1px solid var(--gold);background:rgba(255,255,255,.04);
+      color:var(--gold-lt);font:700 15px 'Plus Jakarta Sans',sans-serif;letter-spacing:.16em;text-indent:.16em;text-decoration:none;cursor:pointer;
+      transition:background .25s,color .25s,transform .25s,box-shadow .25s;
+    }
+    .enter svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s}
+    .enter:hover,.enter:focus-visible{background:var(--gold);color:var(--plum-0);box-shadow:0 10px 30px rgba(200,147,58,.28);transform:translateY(-2px);outline:none}
+    .enter:hover svg,.enter:focus-visible svg{transform:translateX(4px)}
+    .hint{position:absolute;left:0;right:0;bottom:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));
+      background:#F7F2E6;color:var(--plum-1);font:700 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.2em;text-transform:uppercase}
+    /* gentle entrance */
+    .rise{opacity:0;transform:translateY(14px);animation:rise .8s cubic-bezier(.2,.8,.2,1) forwards}
+    .d1{animation-delay:.1s}.d2{animation-delay:.25s}.d3{animation-delay:.45s}.d4{animation-delay:.65s}.d5{animation-delay:.9s}
+    @keyframes rise{to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion:reduce){
+      .rise{animation:none;opacity:1;transform:none} body{transition:none} body.leaving{transform:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="rings" aria-hidden="true"><i></i><i></i></div>
+  <main>
+    <p class="eyebrow rise d1">Welcome to</p>
+    <h1 class="rise d2">E-Homely</h1>
+    <div class="rule rise d3" aria-hidden="true"></div>
+    <p class="tag rise d3">Home-style Kerala meals, ready when you are.</p>
+    <a class="enter rise d4" id="enter" href="{% url 'menu' %}">Enter
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </main>
+  <div class="hint rise d5">&darr; Tap Enter to continue</div>
+
+  <script>
+    // Fade out, then go to the homepage. Without JavaScript the link simply works.
+    (function () {
+      var go = document.getElementById('enter'), url = go.getAttribute('href'), busy = false;
+      function leave(e) {
+        if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0)) return;   // let "open in new tab" work
+        if (e) e.preventDefault();
+        if (busy) return; busy = true;
+        document.body.classList.add('leaving');
+        setTimeout(function () { location.href = url; }, matchMedia('(prefers-reduced-motion:reduce)').matches ? 0 : 450);
+      }
+      go.addEventListener('click', leave);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && document.activeElement !== go) leave(); });
+      // Back button returns here with the page faded out; show it again.
+      addEventListener('pageshow', function (e) { if (e.persisted) { busy = false; document.body.classList.remove('leaving'); } });
+    })();
+  </script>
+</body>
+</html>

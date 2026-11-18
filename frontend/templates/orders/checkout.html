@@ -1,0 +1,137 @@
+{% extends 'orders/base.html' %}
+{% load static %}
+{% block title %}Checkout - E-Homely{% endblock %}
+{% block extra_head %}<style>
+  /* Highlight input text color for name and phone fields */
+  .input-highlight {
+  color: var(--ink) !important;
+}
+.input-highlight::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* ---------- Order summary redrawn as a bill/receipt ---------- */
+.bill {
+  position: relative;
+  background: var(--paper, #fff);
+  padding-bottom: 24px;
+  margin-bottom: 14px;
+  border-bottom: 0;
+  overflow: hidden;
+  font-family: 'Courier New', ui-monospace, monospace;
+}
+.bill .t-brand-wrap { font-family: var(--body); }
+.bill::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0; height: 14px;
+  background-image:
+    linear-gradient(135deg, var(--cream) 50%, transparent 50%),
+    linear-gradient(-135deg, var(--cream) 50%, transparent 50%);
+  background-size: 14px 14px;
+  background-position: bottom;
+  background-repeat: repeat-x;
+}
+.bill-total { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line, #E5DDD1); font: 800 20px var(--display, 'Playfair Display', serif); }
+.bill-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: center; font-family: var(--body); }
+</style>{% endblock %}
+{% block content %}
+<h1>Checkout</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+{% if existing_orders %}
+<div class="panel" style="background:#fff8e1;border-color:#f0c040;margin-bottom:14px">
+  <p style="margin:0 0 6px;font-weight:700">⚠️ You have {{ existing_orders|length }} open order{{ existing_orders|length|pluralize }}</p>
+  {% for o in existing_orders %}
+  <p style="margin:2px 0;font-size:14px">Token <strong>#{{ o.order_no }}</strong> · {{ o.get_meal_display }} · {{ o.get_status_display }} — <a href="{% url 'order_done' o.pk %}">View token</a></p>
+  {% endfor %}
+  <p style="margin:6px 0 0;font-size:13px;color:#666">You can still place another order below.</p>
+</div>
+{% endif %}
+
+{% if meal_label %}
+<div class="panel" style="background:#F3EAED;border-color:#D9B9BD;margin-bottom:14px">
+  <p style="margin:0;font-weight:700">🍽 {{ meal_label }}
+    {% if meal_state == 'open' %}<span style="color:#58283B"> · Serving now — collect today</span>
+    {% elif meal_state == 'later' %}<span style="color:#b06000"> · Pre-order — collect {{ meal_time }}</span>
+    {% else %}<span style="color:#b06000"> · Pre-order for tomorrow — collect {{ meal_time }}</span>{% endif %}
+  </p>
+</div>
+{% endif %}
+
+<div class="checkout">
+  <form method="post" class="panel" id="details" action="{% url 'checkout' %}">
+    <h2 style="margin-top:0">Who's ordering?</h2>
+    {% csrf_token %}
+    <input type="hidden" name="cart" id="cart">
+    <div class="field">
+      <label for="name">Name</label>
+      <input class="input-highlight" id="name" name="name" maxlength="100" autocomplete="name"
+        value="{{ name|default:'' }}" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone number</label>
+      <input class="input-highlight" id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+        maxlength="15" value="{{ phone|default:'' }}" required>
+    </div>
+    <p class="fine">You'll pay the full amount now with Razorpay (UPI, card or netbanking) and get your token straight away.</p>
+    <button type="submit" id="send">Pay with Razorpay</button>
+  </form>
+
+  <aside class="panel summary bill">
+    <div class="t-brand-wrap" style="margin-bottom:12px">
+      <img class="token-logo" src="{% static 'orders/logo.svg' %}" alt="E-Homely" width="28" height="28">
+      <span class="t-brand">YOUR BILL</span>
+    </div>
+    <div id="lines"></div>
+    <div class="bill-total"><span>Total</span><span id="total">0</span></div>
+    <p class="bill-note">Paid in full online &middot; nothing due at the counter</p>
+  </aside>
+</div>
+
+{{ dishes|json_script:'dishes-data' }}
+<script>
+  document.getElementById('cart').value = localStorage.getItem('cart') || '{}';
+
+  const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+  const dishes = JSON.parse(document.getElementById('dishes-data').textContent);
+  const byId = Object.fromEntries(dishes.map(d => [d.id, d]));
+  const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+
+  let total = 0, html = '';
+  Object.entries(cart).forEach(([id, qty]) => {
+    const d = byId[id];
+    if (!d) return;
+    const sum = Number(d.price) * qty;
+    total += sum;
+    html += `<div class="line">
+      <div class="pic"><span class="ph">${esc(d.name.charAt(0))}</span></div>
+      <div class="grow"><strong>${esc(d.name)}</strong><br><span class="fine">${qty} x ${esc(d.price)}</span></div>
+      <strong>${sum.toFixed(2)}</strong>
+    </div>`;
+  });
+
+  const money = n => (Math.round(n * 100) / 100).toFixed(2);
+
+  if (html) {
+    document.getElementById('lines').innerHTML = html;
+    document.getElementById('total').textContent = money(total);
+    document.getElementById('send').textContent = 'Pay ' + money(total) + ' with Razorpay';
+  } else {
+    document.getElementById('lines').innerHTML =
+      "<p>Your cart is empty.</p><a class=\"btn\" href=\"{% url 'menu' %}\">Choose your dishes</a>";
+    document.getElementById('send').disabled = true;
+  }
+</script>
+<script>
+  // Always show the current cart. A page restored by the Back button, or a cart changed in another tab, is reloaded.
+  window.addEventListener('pageshow', e => { if (e.persisted) location.replace(location.pathname); });
+  window.addEventListener('storage', e => { if (e.key === 'cart') location.replace(location.pathname); });
+  // The form always sends the latest cart, never the copy read when the page opened.
+  document.getElementById('details').addEventListener('submit', () => {
+    document.getElementById('cart').value = localStorage.getItem('cart') || '{}';
+    document.getElementById('send').disabled = true;   // one tap = one order
+  });
+</script>
+{% endblock %}

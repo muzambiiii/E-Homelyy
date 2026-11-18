@@ -1,0 +1,10 @@
+{% extends 'orders/desktop/base.html' %}
+{% block title %}Location | E-Homely{% endblock %}
+{% block extra_head %}{% include 'orders/_location_css.html' %}{% endblock %}
+{% block bodyclass %}location{% endblock %}
+
+{% block content %}
+<div class="wrap">
+{% include 'orders/_location_body.html' %}
+</div>
+{% endblock %}

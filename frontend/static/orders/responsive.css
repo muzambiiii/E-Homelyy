@@ -1,0 +1,188 @@
+/* =====================================================================
+   E-Homely responsive safety layer
+   Loaded LAST by both the phone layout (orders/base.html) and the
+   desktop layout (orders/desktop/base.html), so the same site behaves
+   on any screen: phone, tablet, laptop, big monitor.
+
+   Goals
+   - nothing is wider than the screen (no sideways scrolling / cut-off)
+   - grid and flex children can shrink instead of pushing each other
+     out of place or overlapping
+   - text wraps instead of overflowing its card
+   - full-height sections use the *visible* height on phones
+     (the address bar no longer makes them jump or get cropped)
+   - fixed buttons (cart bar, chat) stay clear of the notch / home bar
+   ===================================================================== */
+
+/* ---------- 1. Basics ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body { min-width: 320px; }
+
+img, svg, video, canvas, iframe, table { max-width: 100%; }
+
+/* ---------- 2. Grid / flex children may shrink ----------
+   Without min-width:0 a long word or a wide image makes its column grow
+   and the neighbouring columns get squashed on top of each other. */
+.dish > *, .line > *, .sum-line > *, .order > *, .stockrow > *,
+.co-grid > *, .checkout > *, .shop > *, .col > *,
+.dishes > *, .dgrid > *, .meals > *, .d-meals-grid > *,
+.d-foot-grid > *, .d-hero-grid > *, .foot-steps > *, .hours-compact > *,
+.nowbox > *, .adv-cards > *, .bar > *, .topnav .wrap > *,
+.foot .wrap > *, .site-footer > * {
+  min-width: 0;
+}
+
+/* ---------- 3. Text never spills out of its box ---------- */
+h1, h2, h3, h4, p, li, label, small, .lead, .info, .blurb {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Long Malayalam / long dish names should wrap, not push the layout */
+.dish, .dcard, .dpanel, .panel, .mealcard, .d-meal-card, .token-card {
+  overflow-wrap: break-word;
+}
+
+/* Buttons and chips that were forced onto one line may wrap on tiny screens */
+@media (max-width: 420px) {
+  .d-meal-btn, .btn, .cta, .pill { white-space: normal; }
+  .stepper { flex-wrap: wrap; row-gap: 8px; }
+}
+
+/* Wide things scroll inside themselves, never the whole page */
+.stepper, .chips, .table-wrap { max-width: 100%; }
+.table-wrap, .orders-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- 4. Full-height sections use the visible height ---------- */
+@supports (height: 100dvh) {
+  body, body.desktop { min-height: 100dvh; }
+}
+
+/* ---------- 5. Header never overflows or wraps into two messy lines ---------- */
+.bar, .topnav .wrap { flex-wrap: nowrap; }
+.brand { min-width: 0; flex: 0 1 auto; }
+.brand span strong { white-space: nowrap; }   /* the name stays on one line */
+.nav, .nav-links { flex-shrink: 0; }
+
+/* Phones: make room by trimming the small tagline first, then spacing,
+   then (on the very smallest screens) the secondary "About" link.
+   The brand name itself is never cut. */
+@media (max-width: 400px) {
+  .brand span small { display: none; }
+  .brand span strong { letter-spacing: 1px; font-size: 16px; }
+  .bar { padding-left: 10px; padding-right: 10px; gap: 8px; }
+  .nav { gap: 10px; font-size: 14px; }
+}
+@media (max-width: 340px) {
+  .nav > a:not(.pill):nth-of-type(2) { display: none; }   /* "About" */
+}
+
+/* ---------- 6. Fixed buttons respect notches / home bar ---------- */
+.cartbar {
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.chat-toggle {
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Chat window: always fits inside the visible screen */
+.chat-window {
+  width: min(360px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  height: min(520px, calc(100vh - 120px));
+}
+@supports (height: 100dvh) {
+  .chat-window { height: min(520px, calc(100dvh - 120px)); }
+}
+@media (max-width: 699px) {
+  .chat-window {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    height: min(520px, calc(100vh - 150px));
+    max-height: none;
+  }
+  @supports (height: 100dvh) {
+    .chat-window { height: min(520px, calc(100dvh - 150px)); }
+  }
+  body:has(#cartbar.show) .chat-window {
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    height: min(480px, calc(100vh - 190px));
+  }
+  @supports (height: 100dvh) {
+    body:has(#cartbar.show) .chat-window { height: min(480px, calc(100dvh - 190px)); }
+  }
+  body:has(#cartbar.show) .chat-toggle {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---------- 6b. Dish wheel (menu page) uses the visible screen height ---------- */
+@supports (height: 100dvh) {
+  :root { --R: min(46vw, 34dvh, 190px); }
+  .wheel { top: clamp(calc(var(--R) + 8px), var(--wheel-top, 50dvh), calc(100dvh - var(--R) - 8px)); }
+}
+
+/* ---------- 7. Desktop layout on narrower windows ---------- */
+/* Checkout: the 320px minimum column used to crush the form between
+   861px and ~1000px wide; let both columns shrink instead. */
+.co-grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, .85fr); }
+@media (min-width: 1200px) { .co-grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); } }
+@media (max-width: 860px)  { .co-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Meal cards / footer columns: 1fr can grow with its content; minmax(0,1fr) cannot */
+.d-meals-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.d-foot-grid  { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr); }
+@media (min-width: 1024px) and (max-width: 1180px) {
+  .d-foot-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.35fr); }
+}
+@media (max-width: 960px) {
+  .d-meals-grid, .d-foot-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 640px) and (max-width: 960px) {
+  /* tablets: two meal cards per row instead of one very wide card */
+  .d-meals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Cart line in the order summary: picture | name | price */
+.sum-line { grid-template-columns: 52px minmax(0, 1fr) auto; }
+
+/* ---------- 8. Phone layout ---------- */
+.dish { grid-template-columns: 88px minmax(0, 1fr) auto; }
+@media (max-width: 480px) { .dish { grid-template-columns: 72px minmax(0, 1fr); } }
+
+.meals { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .meals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Small footer steps / opening hours: 3 across only when there is room */
+.foot-steps, .hours-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 340px) {
+  .foot-steps, .hours-compact { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 9. Very small / very large screens ---------- */
+@media (max-width: 340px) {
+  main, body.home main { padding-left: 10px; padding-right: 10px; }
+  .panel, .dpanel { padding: 14px; }
+}
+
+/* Short landscape phones: don't force a tall hero that gets cropped */
+@media (max-height: 480px) and (orientation: landscape) {
+  .d-screen, .d-screen-1 { min-height: auto; }
+}
+
+/* ---------- 10. Back / Forward buttons ----------
+   While a page is loading or being restored, scroll-snap and smooth scrolling are
+   switched off (nav.js adds .eh-ready afterwards). Without this the browser fights
+   the snapping and the page jumps or lands on the wrong spot after Back. */
+html:not(.eh-ready) { scroll-behavior: auto !important; scroll-snap-type: none !important; }

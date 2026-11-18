@@ -1,0 +1,184 @@
+{% extends 'orders/base.html' %}
+{% load static %}
+{% block title %}Orders{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'orders/staff.css' %}">{% endblock %}
+{% block content %}
+{% csrf_token %}
+<div class="t-brand-wrap" style="margin-bottom:8px">
+  <img class="brand-logo" src="{% static 'orders/logo.svg' %}" alt="E-Homely" width="34" height="34">
+  <span class="t-brand">KITCHEN DASHBOARD</span>
+</div>
+<p style="margin:6px 0 12px"><strong>Orders</strong> | <a href='/staff/menu/'>Menu stock</a></p>
+<div id="meal-tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <button class="tab-btn active" data-meal="all">All</button>
+  <button class="tab-btn" data-meal="breakfast">Breakfast</button>
+  <button class="tab-btn" data-meal="lunch">Lunch</button>
+  <button class="tab-btn" data-meal="dinner">Dinner</button>
+</div>
+<style>
+  /* FIX: the global button rule sets white text; with a white background the tabs were
+     invisible until hovered. Give them explicit dark text and a proper hover. */
+  .tab-btn{padding:6px 16px;border:1.5px solid #58283B;border-radius:999px;background:#fff;color:#58283B;cursor:pointer;font-weight:600;font-size:13px;box-shadow:none}
+  .tab-btn:hover{background:#F3EAED;color:#58283B;box-shadow:none}
+  .tab-btn.active,.tab-btn.active:hover{background:#58283B;color:#fff;border-color:#58283B}
+  .pre-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;margin-left:6px;background:#1f3d8a;color:#fff}
+  #pre-alert{display:none;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#e8eefc;border:2px solid #1f3d8a;color:#1f3d8a;font-weight:700;align-items:center;justify-content:space-between;gap:10px}
+  #pre-alert.show{display:flex}
+  #pre-alert.flash{animation:preflash .8s 4}
+  @keyframes preflash{50%{background:#1f3d8a;color:#fff}}
+  #pre-alert button{background:#1f3d8a;color:#fff;box-shadow:none;padding:6px 14px;font-size:13px}
+  .meal-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:6px;background:#F3EAED;color:#58283B}
+</style>
+<div id='pre-alert' role='alert'><span id='pre-alert-text'></span><button type='button' id='pre-alert-ok'>Got it</button></div>
+<h1>Open orders <span id='order-count' style='font-size:16px;font-weight:400;color:#888'></span></h1>
+<div id='list'></div>
+<script>
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const seen = new Set();
+  let first = true;
+  let activeMeal = 'all';
+  let allOrders = [];
+
+  const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+  function beep(double) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // A pre-order for tomorrow gets a distinct double beep so staff can tell it from a normal order.
+      (double ? [0, 0.35] : [0]).forEach(t => {
+        const osc = ctx.createOscillator();
+        osc.frequency.value = double ? 660 : 440;
+        osc.connect(ctx.destination);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.25);
+      });
+    } catch (e) {}
+  }
+  function preAlert(list) {
+    const box = document.getElementById('pre-alert');
+    document.getElementById('pre-alert-text').textContent =
+      '🔔 New pre-order for tomorrow: ' + list.map(o => `#${o.order_no} ${o.meal_label} (${o.name})`).join(', ');
+    box.classList.remove('flash'); void box.offsetWidth;
+    box.classList.add('show', 'flash');
+    document.title = '🔔 Pre-order for tomorrow – Orders';
+  }
+  document.getElementById('pre-alert-ok').addEventListener('click', () => {
+    document.getElementById('pre-alert').classList.remove('show', 'flash');
+    document.title = 'Orders';
+  });
+
+  function btn(o, status, label) {
+    return `<button data-id='${o.id}' data-s='${status}' ${o.status === status ? 'disabled' : ''}>${label}</button>`;
+  }
+
+  function buttons(o) {
+    // Once an order is cancelled, drop the kitchen-flow buttons and show a
+    // refund button instead - either a note that it's done, or a retry
+    // button for the rare case the automatic refund-on-cancel couldn't
+    // reach Razorpay.
+    if (o.status === 'cancelled') {
+      return o.payment_status === 'refunded'
+        ? `<span style='color:#58283B;font-weight:700'>Refunded ✓</span>`
+        : `<button data-id='${o.id}' data-refund='1' style='background:#b06000'>Refund</button>`;
+    }
+    return `<div class='flow'>
+        ${btn(o, 'preparing', 'Preparing')}
+        ${btn(o, 'ready', 'Ready')}
+        ${btn(o, 'picked_up', 'Picked up')}
+      </div>
+      <div class='exc'>
+        ${btn(o, 'out_of_stock', 'Out of stock')}
+        ${btn(o, 'cancelled', 'Cancel')}
+      </div>`;
+  }
+
+  function itemsHtml(o) {
+    return o.items.map(i =>
+      i.sold_out
+        ? `<span style='color:#b00020;font-weight:600'>${esc(i.text)} (sold out)</span>`
+        : esc(i.text)
+    ).join('<br>');
+  }
+
+  function paint() {
+    const filtered = activeMeal === 'all' ? allOrders : allOrders.filter(o => o.meal === activeMeal);
+    const html = filtered.map(o => {
+      const warn = o.items.some(i => i.sold_out);
+      let bg = '';
+      if (warn) bg = 'background:#ffe0e0;';
+      else if (o.is_tomorrow) bg = 'background:#e8eefc;';
+      else if (o.status === 'new') bg = 'background:#fff4cc;';
+      const badge = (o.meal_label ? `<span class='meal-badge'>${esc(o.meal_label)}</span>` : '')
+        + (o.is_tomorrow ? `<span class='pre-badge'>PRE-ORDER · TOMORROW${o.for_date ? ' (' + esc(o.for_date) + ')' : ''}</span>` : '');
+      return `<div class='order' style='${bg}'>
+        <div class='info'>
+          <strong>#${esc(o.order_no)}</strong>${badge} ${esc(o.name)} - ${esc(o.phone)}
+          <small>[${esc(o.status_label)}] &bull; ${esc(o.time)}</small><br>
+          ${itemsHtml(o)}<br>
+          <small>Total ${esc(o.total)} | paid ${esc(o.paid)} | collect ${esc(o.balance)}${o.note ? ' - ' + esc(o.note) : ''}</small>
+        </div>
+        <div class='actions'>${buttons(o)}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('list').innerHTML = html || '<p>No orders for this meal.</p>';
+    document.getElementById('order-count').textContent = filtered.length ? `(${filtered.length})` : '';
+    // Update tab counts
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      const m = btn.dataset.meal;
+      const n = m === 'all' ? allOrders.length : allOrders.filter(o => o.meal === m).length;
+      btn.textContent = (m === 'all' ? 'All' : m.charAt(0).toUpperCase() + m.slice(1)) + (n ? ` (${n})` : '');
+    });
+  }
+
+  async function load() {
+    const res = await fetch('/staff/api/orders/');
+    const data = await res.json();
+    let fresh = false;
+    const freshPre = [];
+    data.orders.forEach(o => {
+      if (!seen.has(o.id)) { seen.add(o.id); fresh = true; if (o.is_tomorrow) freshPre.push(o); }
+    });
+    allOrders = data.orders;
+    paint();
+    if (!first && freshPre.length) { beep(true); preAlert(freshPre); }
+    else if (fresh && !first) beep();
+    if (first) {
+      const waiting = allOrders.filter(o => o.is_tomorrow && o.status === 'new');
+      if (waiting.length) preAlert(waiting);
+    }
+    first = false;
+  }
+
+  document.getElementById('meal-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    activeMeal = btn.dataset.meal;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    paint();
+  });
+
+  document.getElementById('list').addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.refund) {
+      b.disabled = true;
+      await fetch(`/staff/api/orders/${b.dataset.id}/refund/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf},
+      });
+      load();
+      return;
+    }
+    if (!b.dataset.s) return;
+    await fetch(`/staff/api/orders/${b.dataset.id}/status/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'status=' + b.dataset.s,
+    });
+    load();
+  });
+
+  load();
+  setInterval(load, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends 'orders/desktop/base.html' %}
+{% load static %}
+{% block extra_head %}<style>
+.field input, .phone input {color:#000 !important;background:#fff !important;border:1px solid #ccc !important;}
+.field input::placeholder, .phone input::placeholder {color:#555 !important;opacity:1;}
+
+/* ---------- Order summary redrawn as a bill/receipt ---------- */
+.bill { position: relative; padding-bottom: 30px; border-bottom: 0; overflow: hidden; font-family: 'Courier New', ui-monospace, monospace; }
+.bill .t-brand-wrap { font-family: var(--body); }
+.bill::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0; height: 18px;
+  background-image:
+    linear-gradient(135deg, var(--cream) 50%, transparent 50%),
+    linear-gradient(-135deg, var(--cream) 50%, transparent 50%);
+  background-size: 18px 18px;
+  background-position: bottom;
+  background-repeat: repeat-x;
+}
+.bill-note { margin: 14px 0 0; font-size: 12px; color: var(--muted); text-align: center; font-family: var(--body); }
+</style>{% endblock %}
+
+{% block title %}Checkout | E-Homely{% endblock %}
+{% block content %}
+<div class="wrap">
+  <section class="page-head">
+    <span class="eyebrow">Your meal, your way</span>
+    <h1>Checkout</h1>
+    <p>A few details, then pay securely with Razorpay to get your token.</p>
+    <div class="stepper">
+      <div class="step active"><span>1</span>Details</div><i></i>
+      <div class="step"><span>2</span>Payment</div><i></i>
+      <div class="step"><span>3</span>Your token</div>
+    </div>
+  </section>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  {% if existing_orders %}
+  <div class="dpanel" style="background:#fff8e1;border-color:#f0c040;margin-bottom:20px">
+    <p style="margin:0 0 6px;font-weight:700">⚠️ You have {{ existing_orders|length }} open order{{ existing_orders|length|pluralize }}</p>
+    {% for o in existing_orders %}
+    <p style="margin:2px 0;font-size:14px">Token <strong>#{{ o.order_no }}</strong> · {{ o.get_meal_display }} · {{ o.get_status_display }} — <a href="{% url 'order_done' o.pk %}">View token</a></p>
+    {% endfor %}
+    <p style="margin:6px 0 0;font-size:13px;color:#666">You can still place another order below.</p>
+  </div>
+  {% endif %}
+
+  {% if meal_label %}
+  <div class="dpanel" style="background:#F3EAED;border-color:#D9B9BD;margin-bottom:20px">
+    <p style="margin:0;font-weight:700">🍽 {{ meal_label }}
+      {% if meal_state == 'open' %}<span style="color:#58283B"> · Serving now — collect today</span>
+      {% elif meal_state == 'later' %}<span style="color:#b06000"> · Pre-order — collect {{ meal_time }}</span>
+      {% else %}<span style="color:#b06000"> · Pre-order for tomorrow — collect {{ meal_time }}</span>{% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+  <form method="post" id="details" class="co-grid" action="{% url 'checkout' %}">
+    {% csrf_token %}
+    <input type="hidden" name="cart" id="cart">
+    <div class="col">
+      <section class="dpanel">
+        <h2>Who is ordering?</h2><p class="sub">We use these details for your token.</p>
+        <div class="field"><label for="name">Full name</label><input id="name" name="name" type="text" maxlength="100" autocomplete="name" placeholder="Your name" value="{{ name|default:'' }}" required></div>
+        <div class="field"><label for="phone">Mobile number</label>
+          <div class="phone"><span>+91</span><input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="15" placeholder="10-digit mobile number" value="{{ phone|default:'' }}" required></div>
+        </div>
+        <div class="note-box"><span>&#8377;</span><span><strong>Secure payment by Razorpay</strong>UPI, cards and netbanking. No email codes and no sign-up. Your token never expires.</span></div>
+        <button class="btn btn-primary btn-block" type="submit" id="send" style="margin-top:18px">Pay with Razorpay &rarr;</button>
+      </section>
+    </div>
+
+    <aside class="dpanel summary bill">
+      <div class="t-brand-wrap" style="margin-bottom:14px">
+        <img class="token-logo" src="{% static 'orders/logo.svg' %}" alt="E-Homely" width="30" height="30">
+        <span class="t-brand">YOUR BILL</span>
+      </div>
+      <div id="lines" style="margin-top:10px"></div>
+      <div class="rule"></div>
+      <div class="prow big"><span>Total</span><strong id="total">0</strong></div>
+      <p class="bill-note">Paid in full online &middot; nothing due at the counter</p>
+    </aside>
+  </form>
+</div>
+
+{{ dishes|json_script:'dishes-data' }}
+<script>
+  document.getElementById('cart').value = localStorage.getItem('cart') || '{}';
+  const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+  const dishes = JSON.parse(document.getElementById('dishes-data').textContent);
+  const byId = Object.fromEntries(dishes.map(d => [d.id, d]));
+  const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+  const money = n => (Math.round(n * 100) / 100).toFixed(2);
+
+  let total = 0, html = '';
+  Object.entries(cart).forEach(([id, qty]) => {
+    const d = byId[id];
+    if (!d) return;
+    const sum = Number(d.price) * qty;
+    total += sum;
+    html += `<div class="sum-line"><div class="sum-pic"><span class="ph">${esc(d.name.charAt(0))}</span></div>
+      <div><strong>${esc(d.name)}</strong><small>${qty} x ${esc(d.price)}</small></div><strong>${money(sum)}</strong></div>`;
+  });
+
+  if (html) {
+    document.getElementById('lines').innerHTML = html;
+    document.getElementById('total').textContent = money(total);
+    document.getElementById('send').innerHTML = 'Pay ' + money(total) + ' with Razorpay &rarr;';
+  } else {
+    document.getElementById('lines').innerHTML = "<p class=\"empty\">Your cart is empty.</p><a class=\"btn btn-primary\" href=\"{% url 'menu' %}\">Choose your dishes</a>";
+    document.getElementById('send').disabled = true;
+  }
+
+  // Ensure cart data is synchronized on submit
+  const detailsForm = document.getElementById('details');
+  detailsForm.addEventListener('submit', function(e) {
+    const rawCart = localStorage.getItem('cart') || '{}';
+    document.getElementById('cart').value = rawCart;
+    if (!rawCart || rawCart === '{}') {
+      e.preventDefault();
+      alert('Your cart is empty. Please add items before checking out.');
+      return false;
+    }
+    document.getElementById('send').disabled = true;   // one click = one order
+  });
+
+  window.addEventListener('pageshow', e => { if (e.persisted) location.replace(location.pathname); });
+  window.addEventListener('storage', e => { if (e.key === 'cart') location.replace(location.pathname); });
+</script>
+{% endblock %}
